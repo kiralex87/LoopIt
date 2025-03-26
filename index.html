@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Circular Route Generator</title>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 500px; }
+    body { font-family: sans-serif; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h3>בחר מיקום ומרחק ליצירת מסלול מעגלי</h3>
+  <input type="number" id="distance" placeholder="מרחק בק״מ" />
+  <button onclick="sendRequest()">חשב מסלול</button>
+  <p>לחץ על המפה כדי לבחור נקודת התחלה</p>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    let startPoint = null;
+    const map = L.map('map').setView([32.0853, 34.7818], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    let currentLayer = null;
+
+    map.on('click', function(e) {
+      startPoint = [e.latlng.lat, e.latlng.lng];
+      L.marker(startPoint).addTo(map).bindPopup("נקודת התחלה").openPopup();
+    });
+
+    function sendRequest() {
+      const distance = document.getElementById('distance').value;
+      if (!startPoint || !distance) {
+        alert("בחר נקודה והזן מרחק.");
+        return;
+      }
+
+      fetch('/generate-route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start: startPoint, distance: distance })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (currentLayer) map.removeLayer(currentLayer);
+        currentLayer = L.geoJSON(data.route).addTo(map);
+        map.fitBounds(currentLayer.getBounds());
+      });
+    }
+  </script>
+</body>
+</html>
