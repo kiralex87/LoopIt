@@ -1,18 +1,20 @@
-from flask import Flask, render_template, request, jsonify
+import os
 import math
+from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def generate_circular_route(lat, lon, radius_km, points=36):
     route = []
-    radius_deg = radius_km / 111.32
+    radius_deg = radius_km / 111.32  # קירוב ממטרים למעלות
     for i in range(points):
         angle = 2 * math.pi * i / points
         dx = radius_deg * math.cos(angle)
         dy = radius_deg * math.sin(angle)
         point = [lon + dx / math.cos(math.radians(lat)), lat + dy]
         route.append(point)
-    route.append(route[0])
+    route.append(route[0])  # סוגר את הלולאה
     return {
         "type": "Feature",
         "geometry": {
@@ -24,7 +26,10 @@ def generate_circular_route(lat, lon, radius_km, points=36):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    html_path = os.path.join(BASE_DIR, 'index.html')
+    with open(html_path, encoding='utf-8') as f:
+        html = f.read()
+    return render_template_string(html)
 
 @app.route('/generate-route', methods=['POST'])
 def generate_route():
@@ -37,3 +42,4 @@ def generate_route():
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
