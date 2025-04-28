@@ -6,18 +6,18 @@ app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_circular_route(lat, lng, distance_meters=5000):
-    # שלב 1: למשוך גרף מדרכות סביב נקודת ההתחלה
-    G = ox.graph_from_point((lat, lng), dist=2000, network_type='walk')
-
-    # שלב 2: למצוא את הצומת הכי קרוב לנקודת ההתחלה
-    start_node = ox.distance.nearest_nodes(G, lng, lat)
-
-    # שלב 3: לנסות לבנות מסלול מעגלי
     try:
+        # להגדיל את שטח הרשת המורדת כדי להבטיח מסלול
+        G = ox.graph_from_point((lat, lng), dist=3000, network_type='walk')
+        start_node = ox.distance.nearest_nodes(G, lng, lat)
+
+        # ניסיון ליצור מסלול
         route = ox.routing.route_circular(G, start_node, radius=distance_meters/2)
+
         return G, route
+
     except Exception as e:
-        print(f"Failed to create route: {e}")
+        print(f"Error creating route: {e}")
         return None, None
 
 @app.route('/')
