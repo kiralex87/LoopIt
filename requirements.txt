@@ -1,2 +1,5 @@
 Flask==2.3.2
 gunicorn==21.2.0
+osmnx==1.6.0
+scikit-learn==1.4.2
+networkx==3.2.1
