@@ -1,41 +1,74 @@
 import os
-import math
-from flask import Flask, request, jsonify, render_template_string
+import osmnx as ox
+import networkx as nx
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_circular_route(lat, lng, distance_meters=5000):
+    """
+    יוצר מסלול מעגלי על מדרכות אמיתיות סביב נקודת התחלה נתונה.
+    """
     try:
-        # להגדיל את שטח הרשת המורדת כדי להבטיח מסלול
+        # מושכים רשת רחובות להולכי רגל
         G = ox.graph_from_point((lat, lng), dist=3000, network_type='walk')
+        print(f"Loaded graph with {len(G.nodes)} nodes and {len(G.edges)} edges")
+        
+        if len(G.nodes) == 0:
+            raise ValueError("No graph data found around the location.")
+        
+        # מוצאים את הצומת הקרוב ביותר
         start_node = ox.distance.nearest_nodes(G, lng, lat)
-
-        # ניסיון ליצור מסלול
-        route = ox.routing.route_circular(G, start_node, radius=distance_meters/2)
-
-        return G, route
-
+        
+        try:
+            # מנסים לבנות מסלול עגול
+            route = ox.routing.route_circular(G, start_node, radius=distance_meters / 2)
+            return G, route
+        except Exception as e:
+            print(f"Failed to create route at {distance_meters} meters: {e}")
+            # fallback - מנסים לבנות מסלול קצר יותר
+            route = ox.routing.route_circular(G, start_node, radius=2000)
+            return G, route
+        
     except Exception as e:
-        print(f"Error creating route: {e}")
+        print(f"Error loading graph or creating route: {e}")
         return None, None
 
-@app.route('/')
-def index():
-    html_path = os.path.join(BASE_DIR, 'index.html')
-    with open(html_path, encoding='utf-8') as f:
-        html = f.read()
-    return render_template_string(html)
+@app.route('/route', methods=['GET'])
+def route():
+    """
+    נקודת קצה שמקבלת קואורדינטות ומחזירה מסלול ריצה מעגלי במדרכות.
+    """
+    try:
+        lat = float(request.args.get('lat'))
+        lng = float(request.args.get('lng'))
+        distance = float(request.args.get('distance', 5000))  # מרחק ברירת מחדל 5 ק"מ
 
-@app.route('/generate-route', methods=['POST'])
-def generate_route():
-    data = request.get_json()
-    lat = float(data['start'][0])
-    lon = float(data['start'][1])
-    distance_km = float(data['distance'])
-    route = generate_circular_route(lat, lon, distance_km / 2)
-    return jsonify({'route': route})
+        G, route = get_circular_route(lat, lng, distance)
+
+        if G is None or route is None:
+            return jsonify({"error": "Unable to generate route"}), 400
+
+        # המרת הצמתים לרשימת קואורדינטות
+        route_coords = []
+        for node in route:
+            point = G.nodes[node]
+            route_coords.append({
+                "lat": point['y'],
+                "lng": point['x']
+            })
+
+        return jsonify({
+            "route": route_coords
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/')
+def home():
+    return "LoopIt API is running!"
 
 if __name__ == '__main__':
-    app.run(debug=True)
-    
+    port = int(os.environ.get('PORT', 10000))  # ל-Render
+    app.run(host='0.0.0.0', port=port)
